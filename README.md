@@ -1,8 +1,10 @@
 # ConvForever
 
-Scaling Convolutional Neural Networks For Longevity. 
+Scaling Convolutional Neural Networks Forever 
 
 ConvForever aims to look into the fundemtal limits of convolutional neural networks using the ConvNeXT architecture. It will also explore low-bandwidth trainign to enable scaliblity on mulitple consumer GPUs.
+
+Semi Successor to [MLPScaling](https://github.com/BIRD-Laboratories/MLPScaling)
 
 ## Steps to take:
 GPU Hour estimates using a 1x 4090 rig
