@@ -5,3 +5,4 @@ accelerate
 torchvision
 datasets
 scikit-learn
+deepspeed
