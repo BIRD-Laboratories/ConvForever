@@ -1,14 +1,13 @@
 #!/usr/bin/env python
-# Train a ConvNeXt model with EXACTLY --depth N layers (no presets)
-# Real-time relaion2B → OpenRouter → DeepSpeed → HF upload: ConvForever-<depth>-<step>
+# train_convnext.py
+# Load classified JSON, download images, train ConvNeXt with exact depth, upload checkpoints.
 
 import argparse
+import json
 import logging
 import os
 import tempfile
 import shutil
-import time
-import math
 import torch
 import torch.nn as nn
 from PIL import Image
@@ -16,12 +15,11 @@ from torchvision import transforms
 from torch.utils.data import Dataset, DataLoader
 import requests
 from io import BytesIO
-from datasets import load_dataset
-from tqdm import tqdm
 import deepspeed
 from huggingface_hub import HfApi, ModelCard, ModelCardData
+from tqdm import tqdm
 
-# --- Category constants ---
+# --- Category constants (must match classify_captions.py) ---
 CATEGORIES = [
     "fish", "reptile", "amphibian", "bird", "mammal", "insect", "arachnid", "crustacean", "mollusk",
     "fungus", "flower", "fruit", "vegetable", "dish", "beverage", "bread", "meat", "dessert",
@@ -32,33 +30,16 @@ CATEGORIES = [
 ]
 CATEGORY_SET = set(CATEGORIES)
 
-PROMPT_TEMPLATE = (
-    "Summarize this visual caption in one of the categories that describes the image best using this set of words.\n"
-    "{categories}\n\n"
-    "Caption: \"{caption}\"\n\n"
-    "Respond using only one word."
-)
-
-# --- Custom ConvNeXt Builder (no timm presets) ---
 def make_convnext_by_depth(depth: int, num_classes=1000, in_chans=3, **kwargs):
-    """
-    Build a ConvNeXt model with exactly `depth` transformer blocks.
-    Distributes blocks across 4 stages as evenly as possible (ConvNeXt-style).
-    Uses standard ConvNeXt config: dims=[96, 192, 384, 768] for base-scale.
-    """
     if depth < 4:
-        raise ValueError("Depth must be at least 4 (1 block per stage).")
-    
-    # Evenly distribute depth across 4 stages
+        raise ValueError("Depth must be at least 4.")
     base = depth // 4
     extra = depth % 4
     depths = [base] * 4
     for i in range(extra):
-        depths[i] += 1  # add remainder to early stages
-
+        depths[i] += 1
     from timm.models.convnext import ConvNeXt
-    # Use standard base dims; you can scale them if desired
-    dims = [96, 192, 384, 768]  # This is ConvNeXt-Tiny/Small scale
+    dims = [96, 192, 384, 768]
     model = ConvNeXt(
         in_chans=in_chans,
         num_classes=num_classes,
@@ -68,26 +49,6 @@ def make_convnext_by_depth(depth: int, num_classes=1000, in_chans=3, **kwargs):
         **{k: v for k, v in kwargs.items() if k != "drop_path_rate"}
     )
     return model, depth
-
-# --- OpenRouter ---
-def get_openrouter_response(prompt: str, api_key: str, max_retries=3) -> str | None:
-    headers = {"Authorization": f"Bearer {api_key}", "Content-Type": "application/json"}
-    payload = {
-        "model": "amazon/nova-2-lite-v1:free",
-        "messages": [{"role": "user", "content": prompt}],
-        "max_tokens": 10,
-        "temperature": 0.0,
-        "top_p": 1.0
-    }
-    for attempt in range(max_retries):
-        try:
-            r = requests.post("https://openrouter.ai/api/v1/chat/completions", headers=headers, json=payload, timeout=30)
-            if r.status_code == 200:
-                return r.json()["choices"][0]["message"]["content"].strip().lower().rstrip(".")
-        except Exception as e:
-            logging.warning(f"OpenRouter error (attempt {attempt+1}): {e}")
-        time.sleep(1 << attempt)
-    return None
 
 def download_image_to_path(url, temp_dir):
     try:
@@ -100,17 +61,25 @@ def download_image_to_path(url, temp_dir):
     except Exception:
         return None
 
-class TempImageDataset(Dataset):
-    def __init__(self, image_paths, labels, transform=None):
-        self.image_paths = image_paths
-        self.labels = labels
+class JsonImageDataset(Dataset):
+    def __init__(self, records, transform=None):
+        self.records = records
         self.transform = transform
         self.label_to_id = {cat: i for i, cat in enumerate(CATEGORIES)}
-    def __len__(self): return len(self.image_paths)
+    def __len__(self): return len(self.records)
     def __getitem__(self, idx):
-        img = Image.open(self.image_paths[idx]).convert("RGB")
-        if self.transform: img = self.transform(img)
-        return img, self.label_to_id[self.labels[idx]]
+        rec = self.records[idx]
+        temp_dir = tempfile.mkdtemp()
+        img_path = download_image_to_path(rec["url"], temp_dir)
+        if not img_path:
+            shutil.rmtree(temp_dir)
+            return self.__getitem__((idx + 1) % len(self))
+        img = Image.open(img_path).convert("RGB")
+        if self.transform:
+            img = self.transform(img)
+        shutil.rmtree(temp_dir, ignore_errors=True)
+        label_id = self.label_to_id[rec["label"]]
+        return img, label_id
 
 def get_transforms():
     return transforms.Compose([
@@ -135,14 +104,13 @@ def upload_to_hf(model, step, depth_num, org="collegeofthedesert"):
             HfApi().upload_folder(folder_path=tmp, repo_id=repo_id, repo_type="model")
             logging.info(f"✅ Uploaded to https://huggingface.co/{repo_id}")
 
-# --- Main ---
 def main():
     parser = argparse.ArgumentParser()
     parser.add_argument("--depth", type=int, required=True)
     parser.add_argument("--micro_batch_size", type=int, default=4)
     parser.add_argument("--gradient_accumulation_steps", type=int, default=4)
     parser.add_argument("--lr", type=float, default=3e-4)
-    parser.add_argument("--max_examples", type=int, default=5000)
+    parser.add_argument("--classified_json", type=str, default="classified_captions.jsonl")
     parser.add_argument("--upload_every", type=int, default=500)
     parser.add_argument("--deepspeed", type=str, required=True)
     parser.add_argument("--local_rank", type=int, default=-1)
@@ -151,11 +119,15 @@ def main():
     logging.basicConfig(level=logging.INFO)
     logger = logging.getLogger(__name__)
 
-    api_key = os.getenv("OPENROUTER_API_KEY")
-    if not api_key:
-        raise ValueError("Set OPENROUTER_API_KEY")
+    # Load classified data
+    records = []
+    with open(args.classified_json, "r") as f:
+        for line in f:
+            if line.strip():
+                records.append(json.loads(line))
+    logger.info(f"Loaded {len(records)} classified records from {args.classified_json}")
 
-    # Build model with EXACT depth
+    # Build model
     model, actual_depth = make_convnext_by_depth(args.depth, num_classes=len(CATEGORIES), drop_path_rate=0.1)
     logger.info(f"✅ Built ConvNeXt with exactly {actual_depth} layers")
 
@@ -163,80 +135,45 @@ def main():
     model_engine, optimizer, _, _ = deepspeed.initialize(
         model=model,
         model_parameters=model.parameters(),
-        config_params=args.deepspeed
+        config_params=args.deepspeed,
+        lr=args.lr
     )
     device = model_engine.device
 
-    # Stream data
-    dataset = load_dataset("laion/relaion2B-en-research", split="train", streaming=True, trust_remote_code=True)
-    dataset_iter = iter(dataset)
     transform = get_transforms()
+    global_step = 0
 
-    total_processed = 0
-    global_accepted = 0
-
-    while total_processed < args.max_examples:
-        image_paths = []
-        labels = []
-        temp_dirs = []
-
-        eff_bs = args.micro_batch_size * args.gradient_accumulation_steps
-        while len(image_paths) < eff_bs and total_processed < args.max_examples:
-            try:
-                item = next(dataset_iter)
-            except StopIteration:
-                break
-            total_processed += 1
-            caption = item.get("caption", "").strip()
-            url = item.get("url", "")
-            if not caption or not url:
-                continue
-
-            temp_dir = tempfile.mkdtemp()
-            temp_dirs.append(temp_dir)
-            img_path = download_image_to_path(url, temp_dir)
-            if not img_path:
-                shutil.rmtree(temp_dir)
-                temp_dirs.pop()
-                continue
-
-            prompt = PROMPT_TEMPLATE.format(categories=", ".join(sorted(CATEGORY_SET)), caption=caption)
-            pred = get_openrouter_response(prompt, api_key)
-            if pred not in CATEGORY_SET:
-                shutil.rmtree(temp_dir)
-                temp_dirs.pop()
-                continue
-
-            image_paths.append(img_path)
-            labels.append(pred)
-            global_accepted += 1
-
-        if not image_paths:
+    # Train in batches
+    eff_bs = args.micro_batch_size * args.gradient_accumulation_steps
+    for i in range(0, len(records), eff_bs):
+        batch_records = records[i:i + eff_bs]
+        if len(batch_records) == 0:
             continue
 
-        # Train
-        ds_batch = TempImageDataset(image_paths, labels, transform=transform)
+        ds_batch = JsonImageDataset(batch_records, transform=transform)
         loader = DataLoader(ds_batch, batch_size=args.micro_batch_size, shuffle=True)
+
         model_engine.train()
         for imgs, labs in loader:
+            if imgs is None or labs is None:
+                continue
             imgs, labs = imgs.to(device), labs.to(device)
             outputs = model_engine(imgs)
             loss = nn.CrossEntropyLoss()(outputs, labs)
             model_engine.backward(loss)
             model_engine.step()
+            global_step += 1
 
-        for d in temp_dirs:
-            shutil.rmtree(d, ignore_errors=True)
+        logger.info(f"Batch {i // eff_bs + 1}, Loss: {loss.item():.4f}")
 
-        logger.info(f"Processed: {total_processed}, Accepted: {global_accepted}, Loss: {loss.item():.4f}")
-
-        if global_accepted % args.upload_every == 0:
+        if global_step % args.upload_every == 0:
             base_model = getattr(model_engine, 'module', model_engine)
-            upload_to_hf(base_model, global_accepted, actual_depth)
+            upload_to_hf(base_model, global_step, actual_depth)
 
+    # Final upload
     base_model = getattr(model_engine, 'module', model_engine)
-    upload_to_hf(base_model, global_accepted, actual_depth)
-    logger.info("✅ Done")
+    upload_to_hf(base_model, global_step, actual_depth)
+    logger.info("✅ Training completed and model uploaded.")
 
 if __name__ == "__main__":
     main()
