@@ -138,13 +138,14 @@ def upload_to_hf(model, step, depth_num, org="collegeofthedesert"):
 # --- Main ---
 def main():
     parser = argparse.ArgumentParser()
-    parser.add_argument("--depth", type=int, required=True, help="Total number of ConvNeXt blocks (e.g., 48)")
+    parser.add_argument("--depth", type=int, required=True)
     parser.add_argument("--micro_batch_size", type=int, default=4)
     parser.add_argument("--gradient_accumulation_steps", type=int, default=4)
     parser.add_argument("--lr", type=float, default=3e-4)
     parser.add_argument("--max_examples", type=int, default=5000)
     parser.add_argument("--upload_every", type=int, default=500)
     parser.add_argument("--deepspeed", type=str, required=True)
+    parser.add_argument("--local_rank", type=int, default=-1)
     args = parser.parse_args()
 
     logging.basicConfig(level=logging.INFO)
