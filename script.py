@@ -73,7 +73,7 @@ def make_convnext_by_depth(depth: int, num_classes=1000, in_chans=3, **kwargs):
 def get_openrouter_response(prompt: str, api_key: str, max_retries=3) -> str | None:
     headers = {"Authorization": f"Bearer {api_key}", "Content-Type": "application/json"}
     payload = {
-        "model": "allenai/olmo-3-1025-7b",
+        "model": "amazon/nova-2-lite-v1:free",
         "messages": [{"role": "user", "content": prompt}],
         "max_tokens": 10,
         "temperature": 0.0,
