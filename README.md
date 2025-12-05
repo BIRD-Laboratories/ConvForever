@@ -6,6 +6,9 @@ ConvForever aims to look into the fundemtal limits of convolutional neural netwo
 
 Semi Successor to [MLPScaling](https://github.com/BIRD-Laboratories/MLPScaling)
 
+Possbile enhancements:
+Compute captions in a dictonary ahead of time, but only store that.
+
 ```
 hf auth login
 deepspeed --num_gpus 1 script.py \
