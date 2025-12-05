@@ -6,6 +6,16 @@ ConvForever aims to look into the fundemtal limits of convolutional neural netwo
 
 Semi Successor to [MLPScaling](https://github.com/BIRD-Laboratories/MLPScaling)
 
+```
+hf-cli auth login
+deepspeed --num_gpus 1 train_convnext_arbitrary_depth.py \
+  --depth 48 \
+  --micro_batch_size 4 \
+  --gradient_accumulation_steps 4 \
+  --max_examples 1000 \
+  --upload_every 200 \
+  --deepspeed ds_config.json
+```
 12/5 9:41 Estimates plan to be ran. Looking into SSD loading for extremely large models. 
 ## Steps to take:
 GPU Hour estimates using a 1x 4090 rig
