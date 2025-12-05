@@ -6,3 +6,4 @@ torchvision
 datasets
 scikit-learn
 deepspeed
+timm
