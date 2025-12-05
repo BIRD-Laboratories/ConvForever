@@ -7,8 +7,8 @@ ConvForever aims to look into the fundemtal limits of convolutional neural netwo
 Semi Successor to [MLPScaling](https://github.com/BIRD-Laboratories/MLPScaling)
 
 ```
-hf-cli auth login
-deepspeed --num_gpus 1 train_convnext_arbitrary_depth.py \
+hf auth login
+deepspeed --num_gpus 1 script.py \
   --depth 48 \
   --micro_batch_size 4 \
   --gradient_accumulation_steps 4 \
