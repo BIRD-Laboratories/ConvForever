@@ -89,7 +89,7 @@ def get_transforms():
         transforms.Normalize(mean=[0.485, 0.456, 0.406], std=[0.229, 0.224, 0.225]),
     ])
 
-def upload_to_hf(model, step, depth_num, org="collegeofthedesert"):
+def upload_to_hf(model, step, depth_num, org):
     model_name = f"ConvForever-{depth_num}-{step}"
     repo_id = f"{org}/{model_name}"
     with tempfile.TemporaryDirectory() as tmp:
@@ -114,6 +114,7 @@ def main():
     parser.add_argument("--upload_every", type=int, default=500)
     parser.add_argument("--deepspeed", type=str, required=True)
     parser.add_argument("--local_rank", type=int, default=-1)
+    parser.add_argument("--org", type=str, required=True, help="Hugging Face organization or username")
     args = parser.parse_args()
 
     logging.basicConfig(level=logging.INFO)
@@ -168,11 +169,11 @@ def main():
 
         if global_step % args.upload_every == 0:
             base_model = getattr(model_engine, 'module', model_engine)
-            upload_to_hf(base_model, global_step, actual_depth)
+            upload_to_hf(base_model, global_step, actual_depth, args.org)
 
     # Final upload
     base_model = getattr(model_engine, 'module', model_engine)
-    upload_to_hf(base_model, global_step, actual_depth)
+    upload_to_hf(base_model, global_step, actual_depth, args.org)
     logger.info("✅ Training completed and model uploaded.")
 
 if __name__ == "__main__":
