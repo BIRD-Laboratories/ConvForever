@@ -1,6 +1,7 @@
 # ConvForever
 
-Scaling Convolutional Neural Networks Forever 
+Scaling Convolutional Neural Networks Forever
+Julian Herrera @ College of the Desert 
 
 ConvForever aims to look into the fundemtal limits of convolutional neural networks using the ConvNeXT architecture. It will also explore low-bandwidth trainign to enable scaliblity on mulitple consumer GPUs.
 
@@ -20,6 +21,7 @@ deepspeed --num_gpus 1 script.py \
   --deepspeed ds_config.json
 ```
 12/5 9:41 Estimates plan to be ran. Looking into SSD loading for extremely large models. 
+12/9 10:36 working on dataset creation mostly, looking into a small hyperparam sweep.
 ## Steps to take:
 GPU Hour estimates using a 1x 4090 rig
 
