@@ -1,6 +1,7 @@
 # ConvForever
 
 Scaling Convolutional Neural Networks Forever
+
 Julian Herrera @ College of the Desert 
 
 ConvForever aims to look into the fundemtal limits of convolutional neural networks using the ConvNeXT architecture. It will also explore low-bandwidth trainign to enable scaliblity on mulitple consumer GPUs.
