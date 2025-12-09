@@ -56,12 +56,15 @@ Testing scripts to find errors before proper training.
 Uses default hyperparameters.
 
 ## Acknowledgements
-Compute Resources
+Compute Resources:
 College of the Desert
 
 For guiding me through this project I thank:
 
 Patrick Jacobs & Felix Marhuenda-Donate
+
+For the original 2024 project:
+Shanghai AI Laboratory
 
 Papers
 https://arxiv.org/abs/2306.13575
