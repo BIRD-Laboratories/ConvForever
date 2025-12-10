@@ -25,7 +25,7 @@ Compute captions in a dictionary ahead of time, but only store that.
 ```bash
 pip install -r requirements.txt
 export OPENROUTER_API_KEY="<your-openrouter-api-key>"
-huggingface-cli login
+huggingface auth login
 ```
 
 ## Usage Instructions
@@ -145,3 +145,7 @@ Huggingface Hub
 
 Dataset
 https://huggingface.co/datasets/Spawning/pd-extended
+
+### Disclaimer
+
+Qwen Coder is used heavily in this project. Reasonable guardrails are in place to ensure quality of code.
