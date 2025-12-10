@@ -4,31 +4,90 @@ Scaling Convolutional Neural Networks Forever
 
 Julian Herrera @ College of the Desert, Palm Desert
 
-ConvForever aims to explore the fundemtal limits of convolutional neural networks using the ConvNeXT architecture. It will also explore low-bandwidth trainign to enable scaliblity on mulitple consumer GPUs.
+ConvForever aims to explore the fundamental limits of convolutional neural networks using the ConvNeXT architecture. It will also explore low-bandwidth training to enable scalability on multiple consumer GPUs.
 
 Semi Successor to [MLPScaling](https://github.com/BIRD-Laboratories/MLPScaling)
 
-Possbile enhancements:
-Compute captions in a dictonary ahead of time, but only store that.
+Possible enhancements:
+Compute captions in a dictionary ahead of time, but only store that.
 
 ## Instructions
 
-Caption creation:
+### Phase 1: Caption Classification
+
+First, classify image captions using an LLM to prepare training data:
 
 ```
-export OPENROUTER_API_KEY="<key>"
-hf auth login
+export OPENROUTER_API_KEY="<your-api-key>"
+hf login
 python llm_class.py \
   --attempt 1 \
   --openrouter_key "$OPENROUTER_API_KEY" \
-  --org "<org-name>" \
-  --sync_every n_steps \
+  --org "<your-huggingface-org>" \
+  --sync_every 500 \
   --rate_limit_pause 0.5
 ```
 
-12/5 9:41 Estimates plan to be ran. Looking into SSD loading for extremely large models. 
+This will create a classified dataset and upload shards to Hugging Face Hub.
 
-12/9 10:36 working on dataset creation mostly, looking into a small hyperparam sweep.
+### Phase 2: Model Training
+
+After classifying the data, train the ConvNeXt model:
+
+#### Option A: Using the wrapper script (with optional DeepSpeed)
+
+The wrapper script allows you to run training with or without DeepSpeed using the same interface:
+
+- Without DeepSpeed:
+```
+python script.py \
+  --depth 32 \
+  --micro_batch_size 4 \
+  --gradient_accumulation_steps 4 \
+  --lr 3e-4 \
+  --classified_json "classified_attempt_1.jsonl" \
+  --upload_every 500 \
+  --org "<your-huggingface-org>"
+```
+
+- With DeepSpeed:
+```
+python script.py \
+  --deepspeed \
+  --depth 32 \
+  --micro_batch_size 4 \
+  --gradient_accumulation_steps 4 \
+  --lr 3e-4 \
+  --classified_json "classified_attempt_1.jsonl" \
+  --upload_every 500 \
+  --org "<your-huggingface-org>"
+```
+
+#### Option B: Direct training (original method)
+
+```
+python train.py \
+  --depth 32 \
+  --micro_batch_size 4 \
+  --gradient_accumulation_steps 4 \
+  --lr 3e-4 \
+  --classified_json "classified_attempt_1.jsonl" \
+  --upload_every 500 \
+  --deepspeed ds_config.json \
+  --org "<your-huggingface-org>"
+```
+
+This will train a ConvNeXt model with the specified depth and upload checkpoints periodically to Hugging Face Hub.
+
+### Requirements
+
+Make sure to install the required dependencies:
+
+```
+pip install -r requirements.txt
+```
+
+And ensure you have configured DeepSpeed properly with a configuration file (ds_config.json) if using DeepSpeed.
 
 ## Steps to take:
 GPU Hour estimates using a 1x 4090 rig
