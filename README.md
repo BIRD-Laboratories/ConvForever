@@ -4,56 +4,123 @@ Scaling Convolutional Neural Networks Forever
 
 Julian Herrera @ College of the Desert, Palm Desert
 
-ConvForever aims to explore the fundemtal limits of convolutional neural networks using the ConvNeXT architecture. It will also explore low-bandwidth trainign to enable scaliblity on mulitple consumer GPUs.
+ConvForever aims to explore the fundamental limits of convolutional neural networks using the ConvNeXt architecture. It will also explore low-bandwidth training to enable scalability on multiple consumer GPUs.
 
 Semi Successor to [MLPScaling](https://github.com/BIRD-Laboratories/MLPScaling)
 
-Possbile enhancements:
-Compute captions in a dictonary ahead of time, but only store that.
+Possible enhancements:
+Compute captions in a dictionary ahead of time, but only store that.
 
-## Instructions
+## Project Structure
 
-Caption creation:
+- `llm_class.py` - Classify captions from datasets using Nova 2 Lite API
+- `train.py` - Main training script for ConvNeXt models
+- `script.py` - Wrapper for train.py with optional DeepSpeed support
+- `util-script.py` - Utility functions
+- `ds_config.json` - DeepSpeed configuration file
+- `requirements.txt` - Python dependencies
 
+## Setup
+
+```bash
+pip install -r requirements.txt
+export OPENROUTER_API_KEY="<your-openrouter-api-key>"
+huggingface-cli login
 ```
-export OPENROUTER_API_KEY="<key>"
-hf auth login
+
+## Usage Instructions
+
+### 1. Caption Classification (Optional - if you don't have classified data)
+
+```bash
 python llm_class.py \
   --attempt 1 \
   --openrouter_key "$OPENROUTER_API_KEY" \
-  --org "<org-name>" \
-  --sync_every n_steps \
+  --org "<your-hf-org>" \
+  --sync_every 500 \
   --rate_limit_pause 0.5
 ```
 
-12/5 9:41 Estimates plan to be ran. Looking into SSD loading for extremely large models. 
+### 2. Model Training
 
-12/9 10:36 working on dataset creation mostly, looking into a small hyperparam sweep.
+#### Without DeepSpeed (single GPU):
+```bash
+python train.py \
+  --depth 16 \
+  --micro_batch_size 4 \
+  --gradient_accumulation_steps 4 \
+  --lr 3e-4 \
+  --classified_json classified_captions.jsonl \
+  --upload_every 500 \
+  --org "<your-hf-org>"
+```
 
-## Steps to take:
-GPU Hour estimates using a 1x 4090 rig
+#### With DeepSpeed (multi-GPU):
+```bash
+deepspeed train.py \
+  --depth 16 \
+  --micro_batch_size 4 \
+  --gradient_accumulation_steps 4 \
+  --lr 3e-4 \
+  --classified_json classified_captions.jsonl \
+  --upload_every 500 \
+  --use_deepspeed \
+  --deepspeed_config ds_config.json \
+  --org "<your-hf-org>"
+```
 
-Estimates cost as well using the vast ai servers, add padding due to scaling losses
+#### Using the wrapper script (with optional DeepSpeed):
+```bash
+# Without DeepSpeed
+python script.py \
+  --depth 16 \
+  --micro_batch_size 4 \
+  --gradient_accumulation_steps 4 \
+  --lr 3e-4 \
+  --classified_json classified_captions.jsonl \
+  --upload_every 500 \
+  --org "<your-hf-org>"
 
-Code base for training,
+# With DeepSpeed
+python script.py \
+  --depth 16 \
+  --micro_batch_size 4 \
+  --gradient_accumulation_steps 4 \
+  --lr 3e-4 \
+  --classified_json classified_captions.jsonl \
+  --upload_every 500 \
+  --use_deepspeed \
+  --deepspeed_config ds_config.json \
+  --org "<your-hf-org>"
+```
 
-Trackio in lieu of W&B 
+## Features
 
-Huggingface framework will be used.
+- Customizable ConvNeXt depth
+- Optional DeepSpeed integration for multi-GPU training
+- Automatic model checkpoint uploads to Hugging Face Hub
+- Gradient accumulation support
+- Image preprocessing and augmentation
+- Error handling for failed image downloads
 
-Dispatch will be done with tmux. 
+## Configuration Options
 
-Dataset will be streamed
+- `--depth`: Number of layers in the ConvNeXt model (minimum 4)
+- `--micro_batch_size`: Batch size per GPU/device
+- `--gradient_accumulation_steps`: Number of steps to accumulate gradients
+- `--lr`: Learning rate
+- `--classified_json`: Path to classified JSONL file
+- `--upload_every`: Upload model every N steps
+- `--use_deepspeed`: Enable DeepSpeed training (optional)
+- `--deepspeed_config`: Path to DeepSpeed configuration file
+- `--org`: Hugging Face organization/user for model uploads
 
-Snapshots of the model periodically uploaded to Huggingface hub public repos put in an organization.
+## Testing
 
-Reformats huggingface model definition with deriviate scripts for the changes.
-
-Deepspeed optimizers.
-
-Testing scripts to find errors before proper training.
-
-Uses default hyperparameters.
+Run the unit tests to validate functionality:
+```bash
+python test_train.py
+```
 
 ## Acknowledgements
 Compute Resources:
