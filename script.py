@@ -23,20 +23,26 @@ def main():
     parser.add_argument("--deepspeed_config", type=str, help="Path to DeepSpeed config file")
     parser.add_argument("--local_rank", type=int, default=-1)
     parser.add_argument("--org", type=str, required=True, help="Hugging Face organization or username")
+    parser.add_argument("--dataset_format", type=str, default="json", choices=["json", "laion", "imagenet", "pd_extended", "laion_imagenet"], help="Dataset format to use")
+    parser.add_argument("--data_split", type=str, default="train", help="Data split to use (for non-JSON formats)")
+    parser.add_argument("--epochs", type=int, default=1, help="Number of epochs to train (for non-JSON formats)")
     
     # Parse known args to handle additional parameters that might be passed to deepspeed
     args, unknown = parser.parse_known_args()
     
     # Build the command for train.py
     cmd = [
-        sys.executable, "-m", "train" if __package__ else "train",
+        sys.executable, "train.py",
         "--depth", str(args.depth),
         "--micro_batch_size", str(args.micro_batch_size),
         "--gradient_accumulation_steps", str(args.gradient_accumulation_steps),
         "--lr", str(args.lr),
         "--classified_json", args.classified_json,
         "--upload_every", str(args.upload_every),
-        "--org", args.org
+        "--org", args.org,
+        "--dataset_format", args.dataset_format,
+        "--data_split", args.data_split,
+        "--epochs", str(args.epochs)
     ]
     
     # Add DeepSpeed related arguments if enabled

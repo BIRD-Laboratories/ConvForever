@@ -148,6 +148,57 @@ class ImageNetDataset(Dataset):
         return img, label
 
 
+class PdExtendedDataset(Dataset):
+    """Dataset class for PD Extended using HuggingFace datasets with pre-classified labels."""
+    
+    def __init__(self, split='train', transform=None, label_mapping_file=None):
+        """
+        Args:
+            split: 'train', 'validation', or 'test'
+            transform: torchvision transforms to apply to images
+            label_mapping_file: Optional file to map PD Extended labels to our categories
+        """
+        # Load PD Extended dataset from HuggingFace
+        self.dataset = load_dataset("Spawning/pd-extended", split=split, trust_remote_code=True)
+        self.transform = transform
+        
+        # If we have a custom label mapping, use it
+        if label_mapping_file and os.path.exists(label_mapping_file):
+            with open(label_mapping_file, 'r') as f:
+                self.label_mapping = json.load(f)
+        else:
+            # Create default mapping based on our categories
+            self.label_mapping = {cat: i for i, cat in enumerate(CATEGORIES)}
+        
+    def __len__(self):
+        return len(self.dataset)
+        
+    def __getitem__(self, idx):
+        item = self.dataset[idx]
+        # Convert image to RGB if needed
+        img = item['image'].convert('RGB')
+        
+        if self.transform:
+            img = self.transform(img)
+        
+        # Get label from the dataset - PD Extended may have string labels that need mapping
+        original_label = item.get('label', item.get('category', 'unknown'))
+        
+        # Map the label to our category IDs
+        if isinstance(original_label, str):
+            # If it's already in our category format, map directly
+            if original_label in self.label_mapping:
+                label = self.label_mapping[original_label]
+            else:
+                # If it's not in our mapping, default to 0 or unknown category
+                label = 0  # or could be self.label_mapping.get('unknown', 0)
+        else:
+            # If it's already a numeric label, use it directly
+            label = original_label
+        
+        return img, label
+
+
 def get_imagenet_dataloader(split='train', batch_size=32, shuffle=True, transform=None, num_workers=4):
     """
     Get a dataloader for ImageNet dataset.
@@ -185,11 +236,12 @@ def get_imagenet_dataloader(split='train', batch_size=32, shuffle=True, transfor
 
 def get_dataset_by_format(dataset_format='imagenet', split='train', batch_size=32, shuffle=True, transform=None, num_workers=4, **kwargs):
     """
-    Get a dataloader for different dataset formats (ImageNet or LAION-style JSON).
+    Get a dataloader for different dataset formats (ImageNet, LAION-style JSON, or PD Extended).
     
     Args:
-        dataset_format: 'imagenet' for standard ImageNet format or 'json' for LAION-style JSON format
-        split: 'train', 'validation', or 'test' (for ImageNet) or path to JSON file (for JSON format)
+        dataset_format: 'imagenet' for standard ImageNet format, 'json'/'laion' for LAION-style JSON format,
+                       or 'pd_extended' for PD Extended format (streamed HuggingFace parquet with pre-classified labels)
+        split: 'train', 'validation', or 'test' (for ImageNet/PD Extended) or path to JSON file (for JSON format)
         batch_size: batch size for dataloader
         shuffle: whether to shuffle the data
         transform: torchvision transforms to apply
@@ -244,6 +296,21 @@ def get_dataset_by_format(dataset_format='imagenet', split='train', batch_size=3
                 ])
         
         dataset = LaionImageNetDataset(split=split, transform=transform, **kwargs)
+    elif dataset_format == 'pd_extended':
+        # Using PD Extended format (streamed HuggingFace parquet with pre-classified labels)
+        if transform is None:
+            if split == 'train':
+                transform = get_transforms()
+            else:
+                # Standard validation transforms (no augmentation)
+                transform = transforms.Compose([
+                    transforms.Resize(256),
+                    transforms.CenterCrop(224),
+                    transforms.ToTensor(),
+                    transforms.Normalize(mean=[0.485, 0.456, 0.406], std=[0.229, 0.224, 0.225]),
+                ])
+        
+        dataset = PdExtendedDataset(split=split, transform=transform, **kwargs)
     else:
         raise ValueError(f"Unsupported dataset format: {dataset_format}")
     

@@ -1,4 +1,4 @@
-```gitignore
+```
 # Python
 __pycache__/
 *.pyc
@@ -8,6 +8,10 @@ __pycache__/
 # Logs and temp files
 *.log
 *.tmp
+*.swp
+
+# Backups
+*.backup
 
 # Environment
 .env

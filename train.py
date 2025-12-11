@@ -11,7 +11,7 @@ import torch
 import torch.nn as nn
 
 import convforever
-from convforever import make_convnext_by_depth, JsonImageDataset, get_transforms, train_with_deepspeed, train_without_deepspeed, upload_to_hf
+from convforever import make_convnext_by_depth, JsonImageDataset, get_transforms, train_with_deepspeed, train_without_deepspeed, upload_to_hf, get_dataset_by_format
 
 
 def main():
@@ -26,18 +26,27 @@ def main():
     parser.add_argument("--deepspeed_config", type=str, help="Path to DeepSpeed config file")
     parser.add_argument("--local_rank", type=int, default=-1)
     parser.add_argument("--org", type=str, required=True, help="Hugging Face organization or username")
+    parser.add_argument("--dataset_format", type=str, default="json", choices=["json", "laion", "imagenet", "pd_extended", "laion_imagenet"], help="Dataset format to use")
+    parser.add_argument("--data_split", type=str, default="train", help="Data split to use (for non-JSON formats)")
+    parser.add_argument("--epochs", type=int, default=1, help="Number of epochs to train (for non-JSON formats)")
     args = parser.parse_args()
 
     logging.basicConfig(level=logging.INFO)
     logger = logging.getLogger(__name__)
 
-    # Load classified data
-    records = []
-    with open(args.classified_json, "r") as f:
-        for line in f:
-            if line.strip():
-                records.append(json.loads(line))
-    logger.info(f"Loaded {len(records)} classified records from {args.classified_json}")
+    # Load classified data or dataset based on format
+    if args.dataset_format in ['json', 'laion']:
+        # Load from JSON file
+        records = []
+        with open(args.classified_json, "r") as f:
+            for line in f:
+                if line.strip():
+                    records.append(json.loads(line))
+        logger.info(f"Loaded {len(records)} classified records from {args.classified_json}")
+    else:
+        # For other formats, we'll use the dataset directly
+        records = None
+        logger.info(f"Using dataset format: {args.dataset_format}, split: {args.data_split}")
 
     # Build model
     model, actual_depth = make_convnext_by_depth(args.depth, num_classes=len(convforever.model.CATEGORIES), drop_path_rate=0.1)
