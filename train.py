@@ -11,7 +11,7 @@ import torch
 import torch.nn as nn
 
 import convforever
-from convforever import make_convnext_by_depth, JsonImageDataset, get_transforms, train_with_deepspeed, train_without_deepspeed, upload_to_hf
+from convforever import make_convnext_by_depth, get_transforms, train_with_deepspeed, train_without_deepspeed, upload_to_hf, get_dataset
 
 
 def main():
@@ -20,7 +20,14 @@ def main():
     parser.add_argument("--micro_batch_size", type=int, default=4)
     parser.add_argument("--gradient_accumulation_steps", type=int, default=4)
     parser.add_argument("--lr", type=float, default=3e-4)
-    parser.add_argument("--classified_json", type=str, default="classified_captions.jsonl")
+    parser.add_argument("--dataset_type", type=str, choices=['laion', 'imagenet'], default='laion',
+                        help="Type of dataset to use: 'laion' for JSON-based or 'imagenet' for ImageNet-1k")
+    parser.add_argument("--classified_json", type=str, default="classified_captions.jsonl",
+                        help="Path to classified JSONL file (used when dataset_type is 'laion')")
+    parser.add_argument("--imagenet_split", type=str, default="train",
+                        help="ImageNet split to use when dataset_type is 'imagenet'")
+    parser.add_argument("--max_imagenet_samples", type=int, default=None,
+                        help="Maximum number of ImageNet samples to load (for debugging)")
     parser.add_argument("--upload_every", type=int, default=500)
     parser.add_argument("--use_deepspeed", action="store_true", help="Enable DeepSpeed training")
     parser.add_argument("--deepspeed_config", type=str, help="Path to DeepSpeed config file")
@@ -31,17 +38,26 @@ def main():
     logging.basicConfig(level=logging.INFO)
     logger = logging.getLogger(__name__)
 
-    # Load classified data
-    records = []
-    with open(args.classified_json, "r") as f:
-        for line in f:
-            if line.strip():
-                records.append(json.loads(line))
-    logger.info(f"Loaded {len(records)} classified records from {args.classified_json}")
+    # Determine number of classes based on dataset type
+    if args.dataset_type == 'laion':
+        num_classes = len(convforever.model.CATEGORIES)  # Our custom categories
+        logger.info(f"Using LAION dataset with {num_classes} classes")
+        
+        # Load classified data for LAION
+        records = []
+        with open(args.classified_json, "r") as f:
+            for line in f:
+                if line.strip():
+                    records.append(json.loads(line))
+        logger.info(f"Loaded {len(records)} classified records from {args.classified_json}")
+    else:  # imagenet
+        num_classes = 1000  # Standard ImageNet has 1000 classes
+        logger.info(f"Using ImageNet dataset with {num_classes} classes")
+        records = []  # We won't use records for ImageNet
 
-    # Build model
-    model, actual_depth = make_convnext_by_depth(args.depth, num_classes=len(convforever.model.CATEGORIES), drop_path_rate=0.1)
-    logger.info(f"✅ Built ConvNeXt with exactly {actual_depth} layers")
+    # Build model with appropriate number of classes
+    model, actual_depth = make_convnext_by_depth(args.depth, num_classes=num_classes, drop_path_rate=0.1)
+    logger.info(f"✅ Built ConvNeXt with exactly {actual_depth} layers and {num_classes} output classes")
 
     # Determine device
     device = torch.device("cuda" if torch.cuda.is_available() else "cpu")

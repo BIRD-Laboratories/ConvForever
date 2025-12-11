@@ -14,8 +14,10 @@ Compute captions in a dictionary ahead of time, but only store that.
 ## Project Structure
 
 - `llm_class.py` - Classify captions from datasets using Nova 2 Lite API
-- `train.py` - Main training script for ConvNeXt models
+- `train.py` - Main training script for ConvNeXt models with support for both LAION and ImageNet datasets
 - `script.py` - Wrapper for train.py with optional DeepSpeed support
+- `import_laion.py` - Import script for LAION-style JSONL datasets
+- `import_imagenet.py` - Import script for ImageNet-1k dataset from HuggingFace
 - `util-script.py` - Utility functions
 - `ds_config.json` - DeepSpeed configuration file
 - `requirements.txt` - Python dependencies
@@ -30,38 +32,63 @@ huggingface auth login
 
 ## Usage Instructions
 
-### 1. Caption Classification (Optional - if you don't have classified data)
+### 1. Dataset Import
 
+#### For LAION-style datasets (JSONL format with image URLs and labels):
 ```bash
-python llm_class.py \
-  --attempt 1 \
-  --openrouter_key "$OPENROUTER_API_KEY" \
-  --org "<your-hf-org>" \
-  --sync_every 500 \
-  --rate_limit_pause 0.5
+python import_laion.py \
+  --input_jsonl classified_captions.jsonl \
+  --limit 1000  # Optional: limit number of records for testing
+```
+
+#### For ImageNet-1k dataset (from HuggingFace):
+```bash
+python import_imagenet.py \
+  --split train \
+  --max_samples 10000  # Optional: limit number of samples for testing
 ```
 
 ### 2. Model Training
 
 #### Without DeepSpeed (single GPU):
+
+**For LAION dataset:**
 ```bash
 python train.py \
   --depth 16 \
   --micro_batch_size 4 \
   --gradient_accumulation_steps 4 \
   --lr 3e-4 \
+  --dataset_type laion \
   --classified_json classified_captions.jsonl \
   --upload_every 500 \
   --org "<your-hf-org>"
 ```
 
+**For ImageNet dataset:**
+```bash
+python train.py \
+  --depth 16 \
+  --micro_batch_size 4 \
+  --gradient_accumulation_steps 4 \
+  --lr 3e-4 \
+  --dataset_type imagenet \
+  --imagenet_split train \
+  --max_imagenet_samples 10000 \  # Optional: limit samples for testing
+  --upload_every 500 \
+  --org "<your-hf-org>"
+```
+
 #### With DeepSpeed (multi-GPU):
+
+**For LAION dataset:**
 ```bash
 deepspeed train.py \
   --depth 16 \
   --micro_batch_size 4 \
   --gradient_accumulation_steps 4 \
   --lr 3e-4 \
+  --dataset_type laion \
   --classified_json classified_captions.jsonl \
   --upload_every 500 \
   --use_deepspeed \
@@ -69,7 +96,25 @@ deepspeed train.py \
   --org "<your-hf-org>"
 ```
 
+**For ImageNet dataset:**
+```bash
+deepspeed train.py \
+  --depth 16 \
+  --micro_batch_size 4 \
+  --gradient_accumulation_steps 4 \
+  --lr 3e-4 \
+  --dataset_type imagenet \
+  --imagenet_split train \
+  --max_imagenet_samples 10000 \  # Optional: limit samples for testing
+  --upload_every 500 \
+  --use_deepspeed \
+  --deepspeed_config ds_config.json \
+  --org "<your-hf-org>"
+```
+
 #### Using the wrapper script (with optional DeepSpeed):
+
+**For LAION dataset:**
 ```bash
 # Without DeepSpeed
 python script.py \
@@ -77,6 +122,7 @@ python script.py \
   --micro_batch_size 4 \
   --gradient_accumulation_steps 4 \
   --lr 3e-4 \
+  --dataset_type laion \
   --classified_json classified_captions.jsonl \
   --upload_every 500 \
   --org "<your-hf-org>"
@@ -87,7 +133,37 @@ python script.py \
   --micro_batch_size 4 \
   --gradient_accumulation_steps 4 \
   --lr 3e-4 \
+  --dataset_type laion \
   --classified_json classified_captions.jsonl \
+  --upload_every 500 \
+  --use_deepspeed \
+  --deepspeed_config ds_config.json \
+  --org "<your-hf-org>"
+```
+
+**For ImageNet dataset:**
+```bash
+# Without DeepSpeed
+python script.py \
+  --depth 16 \
+  --micro_batch_size 4 \
+  --gradient_accumulation_steps 4 \
+  --lr 3e-4 \
+  --dataset_type imagenet \
+  --imagenet_split train \
+  --max_imagenet_samples 10000 \  # Optional: limit samples for testing
+  --upload_every 500 \
+  --org "<your-hf-org>"
+
+# With DeepSpeed
+python script.py \
+  --depth 16 \
+  --micro_batch_size 4 \
+  --gradient_accumulation_steps 4 \
+  --lr 3e-4 \
+  --dataset_type imagenet \
+  --imagenet_split train \
+  --max_imagenet_samples 10000 \  # Optional: limit samples for testing
   --upload_every 500 \
   --use_deepspeed \
   --deepspeed_config ds_config.json \
@@ -97,6 +173,7 @@ python script.py \
 ## Features
 
 - Customizable ConvNeXt depth
+- Support for both LAION-style JSONL datasets and ImageNet-1k datasets
 - Optional DeepSpeed integration for multi-GPU training
 - Automatic model checkpoint uploads to Hugging Face Hub
 - Gradient accumulation support
@@ -109,7 +186,10 @@ python script.py \
 - `--micro_batch_size`: Batch size per GPU/device
 - `--gradient_accumulation_steps`: Number of steps to accumulate gradients
 - `--lr`: Learning rate
-- `--classified_json`: Path to classified JSONL file
+- `--dataset_type`: Type of dataset to use ('laion' for JSONL-based or 'imagenet' for ImageNet-1k)
+- `--classified_json`: Path to classified JSONL file (used when dataset_type is 'laion')
+- `--imagenet_split`: ImageNet split to use when dataset_type is 'imagenet' (default: 'train')
+- `--max_imagenet_samples`: Maximum number of ImageNet samples to load (for debugging)
 - `--upload_every`: Upload model every N steps
 - `--use_deepspeed`: Enable DeepSpeed training (optional)
 - `--deepspeed_config`: Path to DeepSpeed configuration file
@@ -145,6 +225,7 @@ Huggingface Hub
 
 Dataset
 https://huggingface.co/datasets/Spawning/pd-extended
+https://huggingface.co/datasets/ILSVRC/imagenet-1k
 
 ### Disclaimer
 

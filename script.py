@@ -17,7 +17,14 @@ def main():
     parser.add_argument("--micro_batch_size", type=int, default=4)
     parser.add_argument("--gradient_accumulation_steps", type=int, default=4)
     parser.add_argument("--lr", type=float, default=3e-4)
-    parser.add_argument("--classified_json", type=str, default="classified_captions.jsonl")
+    parser.add_argument("--dataset_type", type=str, choices=['laion', 'imagenet'], default='laion',
+                        help="Type of dataset to use: 'laion' for JSON-based or 'imagenet' for ImageNet-1k")
+    parser.add_argument("--classified_json", type=str, default="classified_captions.jsonl",
+                        help="Path to classified JSONL file (used when dataset_type is 'laion')")
+    parser.add_argument("--imagenet_split", type=str, default="train",
+                        help="ImageNet split to use when dataset_type is 'imagenet'")
+    parser.add_argument("--max_imagenet_samples", type=int, default=None,
+                        help="Maximum number of ImageNet samples to load (for debugging)")
     parser.add_argument("--upload_every", type=int, default=500)
     parser.add_argument("--use_deepspeed", action="store_true", help="Enable DeepSpeed training")
     parser.add_argument("--deepspeed_config", type=str, help="Path to DeepSpeed config file")
@@ -29,15 +36,22 @@ def main():
     
     # Build the command for train.py
     cmd = [
-        sys.executable, "-m", "train" if __package__ else "train",
+        sys.executable, "train.py",
         "--depth", str(args.depth),
         "--micro_batch_size", str(args.micro_batch_size),
         "--gradient_accumulation_steps", str(args.gradient_accumulation_steps),
         "--lr", str(args.lr),
+        "--dataset_type", args.dataset_type,
         "--classified_json", args.classified_json,
         "--upload_every", str(args.upload_every),
         "--org", args.org
     ]
+    
+    # Add ImageNet-specific arguments if needed
+    if args.dataset_type == 'imagenet':
+        cmd.extend(["--imagenet_split", args.imagenet_split])
+        if args.max_imagenet_samples:
+            cmd.extend(["--max_imagenet_samples", str(args.max_imagenet_samples)])
     
     # Add DeepSpeed related arguments if enabled
     if args.use_deepspeed:
