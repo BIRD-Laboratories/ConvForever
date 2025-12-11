@@ -6,19 +6,7 @@ Julian Herrera @ College of the Desert, Palm Desert
 
 ConvForever aims to explore the fundamental limits of convolutional neural networks using the ConvNeXt architecture. It will also explore low-bandwidth training to enable scalability on multiple consumer GPUs.
 
-Semi Successor to [MLPScaling](https://github.com/BIRD-Laboratories/MLPScaling)
-
-Possible enhancements:
-Compute captions in a dictionary ahead of time, but only store that.
-
-## Project Structure
-
-- `llm_class.py` - Classify captions from datasets using Nova 2 Lite API
-- `train.py` - Main training script for ConvNeXt models
-- `script.py` - Wrapper for train.py with optional DeepSpeed support
-- `util-script.py` - Utility functions
-- `ds_config.json` - DeepSpeed configuration file
-- `requirements.txt` - Python dependencies
+Semi Successor to [MLPScaling](https://github.com/BIRD-Laboratory/MLPScaling)
 
 ## Setup
 
@@ -30,7 +18,108 @@ huggingface auth login
 
 ## Usage Instructions
 
-### 1. Caption Classification (Optional - if you don't have classified data)
+### Training with Different Dataset Formats
+
+The system supports multiple dataset formats:
+
+- `json`/`laion`: LAION-style JSON format with image URLs and labels (downloads images on-the-fly)
+- `imagenet`: Standard ImageNet format from HuggingFace
+- `pd_extended`: PD Extended format (streamed HuggingFace parquet with pre-classified labels) - **NEW**
+- `laion_imagenet`: LAION format for ImageNet data with possible label mapping
+
+### 1. Training with JSON/LAION Format (Original)
+
+```bash
+# Without DeepSpeed (single GPU):
+python train.py \
+  --depth 16 \
+  --micro_batch_size 4 \
+  --gradient_accumulation_steps 4 \
+  --lr 3e-4 \
+  --classified_json classified_captions.jsonl \
+  --upload_every 500 \
+  --dataset_format json \
+  --org "<your-hf-org>"
+
+# With DeepSpeed (multi-GPU):
+deepspeed train.py \
+  --depth 16 \
+  --micro_batch_size 4 \
+  --gradient_accumulation_steps 4 \
+  --lr 3e-4 \
+  --classified_json classified_captions.jsonl \
+  --upload_every 500 \
+  --dataset_format json \
+  --use_deepspeed \
+  --deepspeed_config ds_config.json \
+  --org "<your-hf-org>"
+```
+
+### 2. Training with PD Extended Format (NEW)
+
+```bash
+# Without DeepSpeed (single GPU):
+python train.py \
+  --depth 16 \
+  --micro_batch_size 4 \
+  --gradient_accumulation_steps 4 \
+  --lr 3e-4 \
+  --dataset_format pd_extended \
+  --data_split train \
+  --epochs 1 \
+  --upload_every 500 \
+  --org "<your-hf-org>"
+
+# With DeepSpeed (multi-GPU):
+deepspeed train.py \
+  --depth 16 \
+  --micro_batch_size 4 \
+  --gradient_accumulation_steps 4 \
+  --lr 3e-4 \
+  --dataset_format pd_extended \
+  --data_split train \
+  --epochs 1 \
+  --upload_every 500 \
+  --use_deepspeed \
+  --deepspeed_config ds_config.json \
+  --org "<your-hf-org>"
+```
+
+### 3. Training with ImageNet Format
+
+```bash
+# Without DeepSpeed (single GPU):
+python train.py \
+  --depth 16 \
+  --micro_batch_size 4 \
+  --gradient_accumulation_steps 4 \
+  --lr 3e-4 \
+  --dataset_format imagenet \
+  --data_split train \
+  --epochs 1 \
+  --upload_every 500 \
+  --org "<your-hf-org>"
+```
+
+### 4. Using the Wrapper Script (Optional DeepSpeed)
+
+```bash
+# PD Extended with DeepSpeed
+python script.py \
+  --depth 16 \
+  --micro_batch_size 4 \
+  --gradient_accumulation_steps 4 \
+  --lr 3e-4 \
+  --dataset_format pd_extended \
+  --data_split train \
+  --epochs 1 \
+  --upload_every 500 \
+  --use_deepspeed \
+  --deepspeed_config ds_config.json \
+  --org "<your-hf-org>"
+```
+
+### 5. Caption Classification (Optional - if you don't have classified data)
 
 ```bash
 python llm_class.py \
@@ -41,75 +130,16 @@ python llm_class.py \
   --rate_limit_pause 0.5
 ```
 
-### 2. Model Training
-
-#### Without DeepSpeed (single GPU):
-```bash
-python train.py \
-  --depth 16 \
-  --micro_batch_size 4 \
-  --gradient_accumulation_steps 4 \
-  --lr 3e-4 \
-  --classified_json classified_captions.jsonl \
-  --upload_every 500 \
-  --org "<your-hf-org>"
-```
-
-#### With DeepSpeed (multi-GPU):
-```bash
-deepspeed train.py \
-  --depth 16 \
-  --micro_batch_size 4 \
-  --gradient_accumulation_steps 4 \
-  --lr 3e-4 \
-  --classified_json classified_captions.jsonl \
-  --upload_every 500 \
-  --use_deepspeed \
-  --deepspeed_config ds_config.json \
-  --org "<your-hf-org>"
-```
-
-#### Using the wrapper script (with optional DeepSpeed):
-```bash
-# Without DeepSpeed
-python script.py \
-  --depth 16 \
-  --micro_batch_size 4 \
-  --gradient_accumulation_steps 4 \
-  --lr 3e-4 \
-  --classified_json classified_captions.jsonl \
-  --upload_every 500 \
-  --org "<your-hf-org>"
-
-# With DeepSpeed
-python script.py \
-  --depth 16 \
-  --micro_batch_size 4 \
-  --gradient_accumulation_steps 4 \
-  --lr 3e-4 \
-  --classified_json classified_captions.jsonl \
-  --upload_every 500 \
-  --use_deepspeed \
-  --deepspeed_config ds_config.json \
-  --org "<your-hf-org>"
-```
-
-## Features
-
-- Customizable ConvNeXt depth
-- Optional DeepSpeed integration for multi-GPU training
-- Automatic model checkpoint uploads to Hugging Face Hub
-- Gradient accumulation support
-- Image preprocessing and augmentation
-- Error handling for failed image downloads
-
 ## Configuration Options
 
 - `--depth`: Number of layers in the ConvNeXt model (minimum 4)
 - `--micro_batch_size`: Batch size per GPU/device
 - `--gradient_accumulation_steps`: Number of steps to accumulate gradients
 - `--lr`: Learning rate
-- `--classified_json`: Path to classified JSONL file
+- `--classified_json`: Path to classified JSONL file (for JSON format)
+- `--dataset_format`: Dataset format ('json', 'laion', 'imagenet', 'pd_extended', 'laion_imagenet')
+- `--data_split`: Data split to use ('train', 'validation', 'test' for non-JSON formats)
+- `--epochs`: Number of epochs to train (for non-JSON formats)
 - `--upload_every`: Upload model every N steps
 - `--use_deepspeed`: Enable DeepSpeed training (optional)
 - `--deepspeed_config`: Path to DeepSpeed configuration file
@@ -123,6 +153,7 @@ python test_train.py
 ```
 
 ## Acknowledgements
+
 Compute Resources:
 College of the Desert
 
