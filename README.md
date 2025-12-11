@@ -6,7 +6,9 @@ Julian Herrera @ College of the Desert, Palm Desert
 
 ConvForever aims to explore the fundamental limits of convolutional neural networks using the ConvNeXt architecture. It will also explore low-bandwidth training to enable scalability on multiple consumer GPUs.
 
-Semi Successor to [MLPScaling](https://github.com/BIRD-Laboratory/MLPScaling)
+I need to work on better auditing. 
+
+Semi Successor to [MLPScaling](https://github.com/BIRD-Laboratories/MLPScaling)
 
 ## Setup
 
