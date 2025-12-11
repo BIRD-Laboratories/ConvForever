@@ -2,6 +2,7 @@
 Dataset utilities for ConvForever
 """
 
+import os
 import tempfile
 import shutil
 import json
@@ -10,6 +11,7 @@ from io import BytesIO
 from PIL import Image
 from torchvision import transforms
 from torch.utils.data import Dataset, DataLoader
+from datasets import load_dataset
 
 from .model import CATEGORIES
 
@@ -51,8 +53,59 @@ class JsonImageDataset(Dataset):
             img = self.transform(img)
         shutil.rmtree(temp_dir, ignore_errors=True)
         
-        label_id = self.label_to_id[rec["label"]]
+        label = rec["label"]
+        # Handle both string labels (LAION format) and numeric labels
+        if isinstance(label, str):
+            label_id = self.label_to_id[label]
+        else:
+            label_id = label
+            
         return img, label_id
+
+
+class LaionImageNetDataset(Dataset):
+    """Dataset class for LAION format ImageNet using HuggingFace datasets with JSON-style labels."""
+    
+    def __init__(self, split='train', transform=None, label_mapping_file=None):
+        """
+        Args:
+            split: 'train', 'validation', or 'test'
+            transform: torchvision transforms to apply to images
+            label_mapping_file: Optional file to map ImageNet class IDs to our categories
+        """
+        # Load ImageNet-1K dataset from HuggingFace
+        self.dataset = load_dataset("ILSVRC/imagenet-1k", split=split, trust_remote_code=True)
+        self.transform = transform
+        
+        # If we have a custom label mapping, use it
+        if label_mapping_file and os.path.exists(label_mapping_file):
+            with open(label_mapping_file, 'r') as f:
+                self.label_mapping = json.load(f)
+        else:
+            # Create default mapping - this would map ImageNet synsets to our categories
+            # For now, we'll just use the original ImageNet labels
+            self.label_mapping = None
+        
+    def __len__(self):
+        return len(self.dataset)
+        
+    def __getitem__(self, idx):
+        item = self.dataset[idx]
+        # Convert image to RGB if needed
+        img = item['image'].convert('RGB')
+        
+        if self.transform:
+            img = self.transform(img)
+        
+        # Get label - handle both raw label and mapped label
+        label = item['label']
+        
+        # If we have a label mapping, apply it
+        if self.label_mapping:
+            # This assumes the mapping converts from ImageNet ID to our category ID
+            label = self.label_mapping.get(str(label), label)
+        
+        return img, label
 
 
 def get_transforms():
@@ -63,3 +116,143 @@ def get_transforms():
         transforms.ToTensor(),
         transforms.Normalize(mean=[0.485, 0.456, 0.406], std=[0.229, 0.224, 0.225]),
     ])
+
+
+class ImageNetDataset(Dataset):
+    """Dataset class for ImageNet using HuggingFace datasets."""
+    
+    def __init__(self, split='train', transform=None):
+        """
+        Args:
+            split: 'train', 'validation', or 'test'
+            transform: torchvision transforms to apply to images
+        """
+        # Load ImageNet-1K dataset from HuggingFace
+        self.dataset = load_dataset("ILSVRC/imagenet-1k", split=split, trust_remote_code=True)
+        self.transform = transform
+        
+    def __len__(self):
+        return len(self.dataset)
+        
+    def __getitem__(self, idx):
+        item = self.dataset[idx]
+        # Convert image to RGB if needed
+        img = item['image'].convert('RGB')
+        
+        if self.transform:
+            img = self.transform(img)
+        
+        # Label is already in numeric form in ImageNet
+        label = item['label']
+        
+        return img, label
+
+
+def get_imagenet_dataloader(split='train', batch_size=32, shuffle=True, transform=None, num_workers=4):
+    """
+    Get a dataloader for ImageNet dataset.
+    
+    Args:
+        split: 'train', 'validation', or 'test'
+        batch_size: batch size for dataloader
+        shuffle: whether to shuffle the data
+        transform: torchvision transforms to apply
+        num_workers: number of worker processes for data loading
+    """
+    if transform is None:
+        if split == 'train':
+            transform = get_transforms()
+        else:
+            # Standard validation transforms (no augmentation)
+            transform = transforms.Compose([
+                transforms.Resize(256),
+                transforms.CenterCrop(224),
+                transforms.ToTensor(),
+                transforms.Normalize(mean=[0.485, 0.456, 0.406], std=[0.229, 0.224, 0.225]),
+            ])
+    
+    dataset = ImageNetDataset(split=split, transform=transform)
+    dataloader = DataLoader(
+        dataset,
+        batch_size=batch_size,
+        shuffle=shuffle,
+        num_workers=num_workers,
+        pin_memory=True
+    )
+    
+    return dataloader
+
+
+def get_dataset_by_format(dataset_format='imagenet', split='train', batch_size=32, shuffle=True, transform=None, num_workers=4, **kwargs):
+    """
+    Get a dataloader for different dataset formats (ImageNet or LAION-style JSON).
+    
+    Args:
+        dataset_format: 'imagenet' for standard ImageNet format or 'json' for LAION-style JSON format
+        split: 'train', 'validation', or 'test' (for ImageNet) or path to JSON file (for JSON format)
+        batch_size: batch size for dataloader
+        shuffle: whether to shuffle the data
+        transform: torchvision transforms to apply
+        num_workers: number of worker processes for data loading
+        **kwargs: additional arguments passed to dataset constructors
+    """
+    if dataset_format == 'imagenet':
+        if transform is None:
+            if split == 'train':
+                transform = get_transforms()
+            else:
+                # Standard validation transforms (no augmentation)
+                transform = transforms.Compose([
+                    transforms.Resize(256),
+                    transforms.CenterCrop(224),
+                    transforms.ToTensor(),
+                    transforms.Normalize(mean=[0.485, 0.456, 0.406], std=[0.229, 0.224, 0.225]),
+                ])
+        
+        dataset = ImageNetDataset(split=split, transform=transform, **kwargs)
+    elif dataset_format == 'laion' or dataset_format == 'json':
+        # For JSON format, split parameter should be the path to the JSON file
+        json_path = split
+        with open(json_path, 'r') as f:
+            records = json.load(f)
+        
+        if transform is None:
+            if 'train' in json_path.lower():
+                transform = get_transforms()
+            else:
+                # Standard validation transforms (no augmentation)
+                transform = transforms.Compose([
+                    transforms.Resize(256),
+                    transforms.CenterCrop(224),
+                    transforms.ToTensor(),
+                    transforms.Normalize(mean=[0.485, 0.456, 0.406], std=[0.229, 0.224, 0.225]),
+                ])
+        
+        dataset = JsonImageDataset(records=records, transform=transform)
+    elif dataset_format == 'laion_imagenet':
+        # Using the LAION format for ImageNet data (with possible label mapping)
+        if transform is None:
+            if split == 'train':
+                transform = get_transforms()
+            else:
+                # Standard validation transforms (no augmentation)
+                transform = transforms.Compose([
+                    transforms.Resize(256),
+                    transforms.CenterCrop(224),
+                    transforms.ToTensor(),
+                    transforms.Normalize(mean=[0.485, 0.456, 0.406], std=[0.229, 0.224, 0.225]),
+                ])
+        
+        dataset = LaionImageNetDataset(split=split, transform=transform, **kwargs)
+    else:
+        raise ValueError(f"Unsupported dataset format: {dataset_format}")
+    
+    dataloader = DataLoader(
+        dataset,
+        batch_size=batch_size,
+        shuffle=shuffle,
+        num_workers=num_workers,
+        pin_memory=True
+    )
+    
+    return dataloader
