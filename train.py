@@ -29,6 +29,18 @@ def main():
     parser.add_argument("--dataset_format", type=str, default="json", choices=["json", "laion", "imagenet", "pd_extended", "laion_imagenet"], help="Dataset format to use")
     parser.add_argument("--data_split", type=str, default="train", help="Data split to use (for non-JSON formats)")
     parser.add_argument("--epochs", type=int, default=1, help="Number of epochs to train (for non-JSON formats)")
+    
+    # Additional hyperparameters from sweep.csv
+    parser.add_argument("--precision", type=str, default="fp32", help="Precision mode (fp32, bf16, etc.)")
+    parser.add_argument("--enable_gradient_checkpointing", action="store_true", help="Enable gradient checkpointing")
+    parser.add_argument("--optimizer", type=str, default="AdamW", help="Optimizer to use")
+    parser.add_argument("--weight_decay", type=float, default=0.01, help="Weight decay value")
+    parser.add_argument("--lr_scheduler_type", type=str, default="cosine", help="Learning rate scheduler type")
+    parser.add_argument("--warmup_epochs", type=int, default=5, help="Number of warmup epochs")
+    parser.add_argument("--drop_path_rate", type=float, default=0.1, help="Drop path rate for regularization")
+    parser.add_argument("--label_smoothing", type=float, default=0.1, help="Label smoothing value")
+    parser.add_argument("--gradient_clipping", type=float, default=1.0, help="Gradient clipping value")
+    
     args = parser.parse_args()
 
     logging.basicConfig(level=logging.INFO)
@@ -49,7 +61,7 @@ def main():
         logger.info(f"Using dataset format: {args.dataset_format}, split: {args.data_split}")
 
     # Build model
-    model, actual_depth = make_convnext_by_depth(args.depth, num_classes=len(convforever.model.CATEGORIES), drop_path_rate=0.1)
+    model, actual_depth = make_convnext_by_depth(args.depth, num_classes=len(convforever.model.CATEGORIES), drop_path_rate=args.drop_path_rate)
     logger.info(f"✅ Built ConvNeXt with exactly {actual_depth} layers")
 
     # Determine device
