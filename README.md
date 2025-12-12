@@ -6,11 +6,13 @@ Julian Herrera @ College of the Desert, Palm Desert
 
 ConvForever aims to explore the fundamental limits of convolutional neural networks using the ConvNeXt architecture. It will also explore low-bandwidth training to enable scalability on multiple consumer GPUs.
 
-I need to work on better auditing. 
+Changelog:
+12/12/25: I am getting closer to running sweep.sh, I intent to write an interim report in latex format. 
 
 Semi Successor to [MLPScaling](https://github.com/BIRD-Laboratories/MLPScaling)
 
 ## Setup
+It is highly recommended to use a venv, although it is not required.
 
 ```bash
 pip install -r requirements.txt
@@ -25,9 +27,8 @@ huggingface auth login
 The system supports multiple dataset formats:
 
 - `json`/`laion`: LAION-style JSON format with image URLs and labels (downloads images on-the-fly)
-- `imagenet`: Standard ImageNet format from HuggingFace
-- `pd_extended`: PD Extended format (streamed HuggingFace parquet with pre-classified labels) - **NEW**
-- `laion_imagenet`: LAION format for ImageNet data with possible label mapping
+- `imagenet`: Standard ImageNet format from HuggingFace, uses imagenet 1k
+- `pd_extended`: PD Extended format (streamed HuggingFace parquet with pre-classified labels)
 
 ### 1. Training with JSON/LAION Format (Original)
 
@@ -103,25 +104,7 @@ python train.py \
   --org "<your-hf-org>"
 ```
 
-### 4. Using the Wrapper Script (Optional DeepSpeed)
-
-```bash
-# PD Extended with DeepSpeed
-python script.py \
-  --depth 16 \
-  --micro_batch_size 4 \
-  --gradient_accumulation_steps 4 \
-  --lr 3e-4 \
-  --dataset_format pd_extended \
-  --data_split train \
-  --epochs 1 \
-  --upload_every 500 \
-  --use_deepspeed \
-  --deepspeed_config ds_config.json \
-  --org "<your-hf-org>"
-```
-
-### 5. Caption Classification (Optional - if you don't have classified data)
+###45. Caption Classification (Optional - if you don't have classified data)
 
 ```bash
 python llm_class.py \
@@ -151,7 +134,7 @@ python llm_class.py \
 
 Run the unit tests to validate functionality:
 ```bash
-python test_train.py
+sh sweep.sh
 ```
 
 ## Acknowledgements
@@ -162,9 +145,6 @@ College of the Desert
 For guiding me through this project I thank:
 
 Patrick Jacobs & Felix Marhuenda-Donate
-
-For the original 2024 project:
-Shanghai AI Laboratory
 
 Papers
 https://arxiv.org/abs/2306.13575
@@ -178,7 +158,6 @@ Huggingface Hub
 
 Dataset
 https://huggingface.co/datasets/Spawning/pd-extended
-
 ### Disclaimer
 
-Qwen Coder is used heavily in this project. Reasonable guardrails are in place to ensure quality of code.
+Qwen Coder and Qwen Deep Researcher is used heavily in this project. Reasonable guardrails are in place to ensure quality of code. More proper testing of code will be implemented.
