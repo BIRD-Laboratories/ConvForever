@@ -15,6 +15,10 @@ from convforever import make_convnext_by_depth, JsonImageDataset, get_transforms
 
 
 def main():
+    # Set environment variables to help with CUDA debugging
+    import os
+    os.environ['CUDA_LAUNCH_BLOCKING'] = '1'  # Makes CUDA errors easier to debug
+    
     parser = argparse.ArgumentParser()
     parser.add_argument("--depth", type=int, required=True)
     parser.add_argument("--micro_batch_size", type=int, default=4)
