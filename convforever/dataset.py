@@ -56,9 +56,19 @@ class JsonImageDataset(Dataset):
         label = rec["label"]
         # Handle both string labels (LAION format) and numeric labels
         if isinstance(label, str):
-            label_id = self.label_to_id[label]
+            if label not in self.label_to_id:
+                # If label is not in our categories, default to 0 (or skip this sample)
+                label_id = 0
+            else:
+                label_id = self.label_to_id[label]
         else:
             label_id = label
+            
+        # Ensure label_id is within valid range [0, len(CATEGORIES)-1]
+        max_valid_label = len(CATEGORIES) - 1
+        if label_id < 0 or label_id > max_valid_label:
+            # If label is out of range, default to 0
+            label_id = 0
             
         return img, label_id
 
@@ -104,6 +114,12 @@ class LaionImageNetDataset(IterableDataset):
                 # This assumes the mapping converts from ImageNet ID to our category ID
                 label = self.label_mapping.get(str(label), label)
             
+            # Ensure label is within valid range [0, len(CATEGORIES)-1]
+            max_valid_label = len(CATEGORIES) - 1
+            if label < 0 or label > max_valid_label:
+                # If label is out of range, default to 0
+                label = 0
+            
             yield img, label
         
 
@@ -142,6 +158,12 @@ class ImageNetDataset(IterableDataset):
             
             # Label is already in numeric form in ImageNet
             label = item['label']
+            
+            # Ensure label is within valid range [0, len(CATEGORIES)-1]
+            max_valid_label = len(CATEGORIES) - 1
+            if label < 0 or label > max_valid_label:
+                # If label is out of range, default to 0
+                label = 0
             
             yield img, label
 
@@ -193,6 +215,12 @@ class PdExtendedDataset(Dataset):
         else:
             # If it's already a numeric label, use it directly
             label = original_label
+        
+        # Ensure label is within valid range [0, len(CATEGORIES)-1]
+        max_valid_label = len(CATEGORIES) - 1
+        if label < 0 or label > max_valid_label:
+            # If label is out of range, default to 0
+            label = 0
         
         return img, label
 

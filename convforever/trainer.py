@@ -44,6 +44,34 @@ def train_with_deepspeed(model, args, device, records, transform):
                     continue
                 imgs, labs = imgs.to(device), labs.to(device)
                 outputs = model_engine(imgs)
+                
+                # Debug: Check for invalid values in outputs and labels
+                if torch.isnan(outputs).any():
+                    print("Warning: NaN found in model outputs")
+                    continue
+                if torch.isinf(outputs).any():
+                    print("Warning: Inf found in model outputs")
+                    continue
+                if torch.isnan(labs).any():
+                    print("Warning: NaN found in labels")
+                    continue
+                if torch.isinf(labs).any():
+                    print("Warning: Inf found in labels")
+                    continue
+                    
+                # Validate label range
+                max_valid_label = outputs.size(1) - 1  # outputs.size(1) is num_classes
+                if labs.max().item() > max_valid_label or labs.min().item() < 0:
+                    print(f"Warning: Label out of range. Max label: {labs.max().item()}, Min label: {labs.min().item()}, Valid range: [0, {max_valid_label}]")
+                    # Filter out invalid labels
+                    valid_mask = (labs >= 0) & (labs <= max_valid_label)
+                    if valid_mask.sum() == 0:
+                        continue  # Skip this batch entirely if all labels are invalid
+                    outputs = outputs[valid_mask]
+                    labs = labs[valid_mask]
+                    if outputs.size(0) == 0:
+                        continue  # Skip if no valid samples left
+                
                 loss = nn.CrossEntropyLoss(label_smoothing=args.label_smoothing)(outputs, labs)
                 model_engine.backward(loss)
                 model_engine.step()
@@ -75,6 +103,34 @@ def train_with_deepspeed(model, args, device, records, transform):
                     continue
                 imgs, labs = imgs.to(device), labs.to(device)
                 outputs = model_engine(imgs)
+                
+                # Debug: Check for invalid values in outputs and labels
+                if torch.isnan(outputs).any():
+                    print("Warning: NaN found in model outputs")
+                    continue
+                if torch.isinf(outputs).any():
+                    print("Warning: Inf found in model outputs")
+                    continue
+                if torch.isnan(labs).any():
+                    print("Warning: NaN found in labels")
+                    continue
+                if torch.isinf(labs).any():
+                    print("Warning: Inf found in labels")
+                    continue
+                    
+                # Validate label range
+                max_valid_label = outputs.size(1) - 1  # outputs.size(1) is num_classes
+                if labs.max().item() > max_valid_label or labs.min().item() < 0:
+                    print(f"Warning: Label out of range. Max label: {labs.max().item()}, Min label: {labs.min().item()}, Valid range: [0, {max_valid_label}]")
+                    # Filter out invalid labels
+                    valid_mask = (labs >= 0) & (labs <= max_valid_label)
+                    if valid_mask.sum() == 0:
+                        continue  # Skip this batch entirely if all labels are invalid
+                    outputs = outputs[valid_mask]
+                    labs = labs[valid_mask]
+                    if outputs.size(0) == 0:
+                        continue  # Skip if no valid samples left
+                
                 loss = nn.CrossEntropyLoss(label_smoothing=args.label_smoothing)(outputs, labs)
                 model_engine.backward(loss)
                 model_engine.step()
@@ -126,6 +182,34 @@ def train_without_deepspeed(model, args, device, records, transform):
                 imgs, labs = imgs.to(device), labs.to(device)
                 
                 outputs = model(imgs)
+                
+                # Debug: Check for invalid values in outputs and labels
+                if torch.isnan(outputs).any():
+                    print("Warning: NaN found in model outputs")
+                    continue
+                if torch.isinf(outputs).any():
+                    print("Warning: Inf found in model outputs")
+                    continue
+                if torch.isnan(labs).any():
+                    print("Warning: NaN found in labels")
+                    continue
+                if torch.isinf(labs).any():
+                    print("Warning: Inf found in labels")
+                    continue
+                    
+                # Validate label range
+                max_valid_label = outputs.size(1) - 1  # outputs.size(1) is num_classes
+                if labs.max().item() > max_valid_label or labs.min().item() < 0:
+                    print(f"Warning: Label out of range. Max label: {labs.max().item()}, Min label: {labs.min().item()}, Valid range: [0, {max_valid_label}]")
+                    # Filter out invalid labels
+                    valid_mask = (labs >= 0) & (labs <= max_valid_label)
+                    if valid_mask.sum() == 0:
+                        continue  # Skip this batch entirely if all labels are invalid
+                    outputs = outputs[valid_mask]
+                    labs = labs[valid_mask]
+                    if outputs.size(0) == 0:
+                        continue  # Skip if no valid samples left
+                
                 loss = criterion(outputs, labs)
                 loss.backward()
                 
@@ -165,6 +249,34 @@ def train_without_deepspeed(model, args, device, records, transform):
                 imgs, labs = imgs.to(device), labs.to(device)
                 
                 outputs = model(imgs)
+                
+                # Debug: Check for invalid values in outputs and labels
+                if torch.isnan(outputs).any():
+                    print("Warning: NaN found in model outputs")
+                    continue
+                if torch.isinf(outputs).any():
+                    print("Warning: Inf found in model outputs")
+                    continue
+                if torch.isnan(labs).any():
+                    print("Warning: NaN found in labels")
+                    continue
+                if torch.isinf(labs).any():
+                    print("Warning: Inf found in labels")
+                    continue
+                    
+                # Validate label range
+                max_valid_label = outputs.size(1) - 1  # outputs.size(1) is num_classes
+                if labs.max().item() > max_valid_label or labs.min().item() < 0:
+                    print(f"Warning: Label out of range. Max label: {labs.max().item()}, Min label: {labs.min().item()}, Valid range: [0, {max_valid_label}]")
+                    # Filter out invalid labels
+                    valid_mask = (labs >= 0) & (labs <= max_valid_label)
+                    if valid_mask.sum() == 0:
+                        continue  # Skip this batch entirely if all labels are invalid
+                    outputs = outputs[valid_mask]
+                    labs = labs[valid_mask]
+                    if outputs.size(0) == 0:
+                        continue  # Skip if no valid samples left
+                
                 loss = criterion(outputs, labs)
                 loss.backward()
                 
