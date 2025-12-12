@@ -10,7 +10,7 @@ import requests
 from io import BytesIO
 from PIL import Image
 from torchvision import transforms
-from torch.utils.data import Dataset, DataLoader
+from torch.utils.data import Dataset, DataLoader, IterableDataset
 from datasets import load_dataset
 
 from .model import CATEGORIES
@@ -63,7 +63,7 @@ class JsonImageDataset(Dataset):
         return img, label_id
 
 
-class LaionImageNetDataset(Dataset):
+class LaionImageNetDataset(IterableDataset):
     """Dataset class for LAION format ImageNet using HuggingFace datasets with JSON-style labels."""
     
     def __init__(self, split='train', transform=None, label_mapping_file=None):
@@ -74,7 +74,7 @@ class LaionImageNetDataset(Dataset):
             label_mapping_file: Optional file to map ImageNet class IDs to our categories
         """
         # Load ImageNet-1K dataset from HuggingFace with streaming enabled
-        self.dataset = load_dataset("ILSVRC/imagenet-1k", split=split, trust_remote_code=True, streaming=True)
+        self.dataset = load_dataset("ILSVRC/imagenet-1k", split=split, streaming=True)
         self.stream = iter(self.dataset)
         self.transform = transform
         
@@ -105,17 +105,6 @@ class LaionImageNetDataset(Dataset):
                 label = self.label_mapping.get(str(label), label)
             
             yield img, label
-
-    def __len__(self):
-        # Streaming datasets don't support len() operation
-        # We can't determine the length without iterating through the whole dataset
-        # So we'll raise an error to indicate this limitation
-        raise NotImplementedError("Streaming datasets don't support __len__")
-        
-    def __getitem__(self, idx):
-        # Streaming datasets don't support random access
-        # This method is not compatible with streaming datasets
-        raise NotImplementedError("Streaming datasets don't support random indexing (__getitem__) with an index. Use iteration instead.")
         
 
 
@@ -129,7 +118,7 @@ def get_transforms():
     ])
 
 
-class ImageNetDataset(Dataset):
+class ImageNetDataset(IterableDataset):
     """Dataset class for ImageNet using HuggingFace datasets."""
     
     def __init__(self, split='train', transform=None):
@@ -139,7 +128,7 @@ class ImageNetDataset(Dataset):
             transform: torchvision transforms to apply to images
         """
         # Load ImageNet-1K dataset from HuggingFace with streaming enabled
-        self.dataset = load_dataset("ILSVRC/imagenet-1k", split=split, trust_remote_code=True, streaming=True)
+        self.dataset = load_dataset("ILSVRC/imagenet-1k", split=split, streaming=True)
         self.transform = transform
 
     def __iter__(self):
@@ -156,17 +145,6 @@ class ImageNetDataset(Dataset):
             
             yield img, label
 
-    def __len__(self):
-        # Streaming datasets don't support len() operation
-        # We can't determine the length without iterating through the whole dataset
-        # So we'll raise an error to indicate this limitation
-        raise NotImplementedError("Streaming datasets don't support __len__")
-        
-    def __getitem__(self, idx):
-        # Streaming datasets don't support random access
-        # This method is not compatible with streaming datasets
-        raise NotImplementedError("Streaming datasets don't support random indexing (__getitem__) with an index. Use iteration instead.")
-
 
 class PdExtendedDataset(Dataset):
     """Dataset class for PD Extended using HuggingFace datasets with pre-classified labels."""
@@ -179,7 +157,7 @@ class PdExtendedDataset(Dataset):
             label_mapping_file: Optional file to map PD Extended labels to our categories
         """
         # Load PD Extended dataset from HuggingFace
-        self.dataset = load_dataset("Spawning/pd-extended", split=split, trust_remote_code=True)
+        self.dataset = load_dataset("Spawning/pd-extended", split=split)
         self.transform = transform
         
         # If we have a custom label mapping, use it
