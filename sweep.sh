@@ -19,6 +19,21 @@ tail -n +2 "$CSV_FILE" | while IFS=',' read -r approx_num_layers precision per_d
         continue
     fi
     
+    # Trim leading/trailing whitespace from variables
+    approx_num_layers=$(echo "$approx_num_layers" | sed 's/^[[:space:]]*//;s/[[:space:]]*$//')
+    precision=$(echo "$precision" | sed 's/^[[:space:]]*//;s/[[:space:]]*$//')
+    per_device_train_batch_size=$(echo "$per_device_train_batch_size" | sed 's/^[[:space:]]*//;s/[[:space:]]*$//')
+    gradient_accumulation_steps=$(echo "$gradient_accumulation_steps" | sed 's/^[[:space:]]*//;s/[[:space:]]*$//')
+    enable_gradient_checkpointing=$(echo "$enable_gradient_checkpointing" | sed 's/^[[:space:]]*//;s/[[:space:]]*$//')
+    optimizer=$(echo "$optimizer" | sed 's/^[[:space:]]*//;s/[[:space:]]*$//')
+    learning_rate=$(echo "$learning_rate" | sed 's/^[[:space:]]*//;s/[[:space:]]*$//')
+    weight_decay=$(echo "$weight_decay" | sed 's/^[[:space:]]*//;s/[[:space:]]*$//')
+    lr_scheduler_type=$(echo "$lr_scheduler_type" | sed 's/^[[:space:]]*//;s/[[:space:]]*$//')
+    warmup_epochs=$(echo "$warmup_epochs" | sed 's/^[[:space:]]*//;s/[[:space:]]*$//')
+    drop_path_rate=$(echo "$drop_path_rate" | sed 's/^[[:space:]]*//;s/[[:space:]]*$//')
+    label_smoothing=$(echo "$label_smoothing" | sed 's/^[[:space:]]*//;s/[[:space:]]*$//')
+    gradient_clipping=$(echo "$gradient_clipping" | sed 's/^[[:space:]]*//;s/[[:space:]]*$//')
+    
     echo "========================================="
     echo "Running training with parameters:"
     echo "  approx_num_layers: $approx_num_layers"
@@ -41,7 +56,7 @@ tail -n +2 "$CSV_FILE" | while IFS=',' read -r approx_num_layers precision per_d
     # Map per_device_train_batch_size to micro_batch_size
     # Convert enable_gradient_checkpointing to boolean flag if true
     GRAD_CHECKPOINT_ARG=""
-    if [[ "$enable_gradient_checkpointing" == "True" || "$enable_gradient_checkpointing" == "true" ]]; then
+    if [[ "$enable_gradient_checkpointing" == "True" || "$enable_gradient_checkpointing" == "true" || "$enable_gradient_checkpointing" == "1" || "$enable_gradient_checkpointing" == "T" || "$enable_gradient_checkpointing" == "Yes" || "$enable_gradient_checkpointing" == "yes" ]]; then
         GRAD_CHECKPOINT_ARG="--enable_gradient_checkpointing"
     fi
     
