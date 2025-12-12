@@ -1,0 +1,5 @@
+approx_num_layers,precision,per_device_train_batch_size,gradient_accumulation_steps,enable_gradient_checkpointing
+20,bf16,8,1,True
+32,bf16,4,4,True
+60,bf16,2,8,True
+96,bf16,1,16,True
