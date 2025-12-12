@@ -76,7 +76,8 @@ tail -n +2 "$CSV_FILE" | while IFS=',' read -r approx_num_layers precision per_d
         --label_smoothing "$label_smoothing" \
         --gradient_clipping "$gradient_clipping" \
         --org "your-org-here" \
-        --dataset_format "json" \
+        --dataset_format "imagenet" \
+        --data_split "train" \
         --epochs 1 \
         --upload_every 500
     
