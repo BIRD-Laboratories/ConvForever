@@ -11,7 +11,7 @@ import torch
 import torch.nn as nn
 
 import convforever
-from convforever import make_convnext_by_depth, JsonImageDataset, get_transforms, train_with_deepspeed, train_without_deepspeed, upload_to_hf, get_dataset_by_format
+from convforever import make_convnext_by_depth, JsonImageDataset, get_transforms, train_with_deepspeed, train_without_deepspeed, upload_to_hf
 
 
 def main():

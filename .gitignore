@@ -1,1 +1,1 @@
-Nothing needs to be added to .gitignore since the changes only include script files (.sh) and Python source files (.py), which are not build artifacts, dependencies, or temporary files that should be ignored.
+Nothing should be ignored based on the provided file changes. The changes consist only of source/config files (.sh, .py) without any build artifacts, dependencies, or temporary files that would warrant adding to .gitignore.
