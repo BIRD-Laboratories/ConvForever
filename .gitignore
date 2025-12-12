@@ -1,1 +1,1 @@
-Nothing should be ignored based on the provided file changes. The added file `test_sweap_params.sh` is a shell script source file, which should not be ignored according to rule #7. Since there are no build artifacts, dependencies, or temporary files in the changes, no additional ignore rules are needed.
+Nothing needs to be added to .gitignore since the changes only include script files (.sh) and Python source files (.py), which are not build artifacts, dependencies, or temporary files that should be ignored.
