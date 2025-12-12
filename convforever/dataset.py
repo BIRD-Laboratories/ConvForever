@@ -73,8 +73,9 @@ class LaionImageNetDataset(Dataset):
             transform: torchvision transforms to apply to images
             label_mapping_file: Optional file to map ImageNet class IDs to our categories
         """
-        # Load ImageNet-1K dataset from HuggingFace
-        self.dataset = load_dataset("ILSVRC/imagenet-1k", split=split, trust_remote_code=True)
+        # Load ImageNet-1K dataset from HuggingFace with streaming enabled
+        self.dataset = load_dataset("ILSVRC/imagenet-1k", split=split, trust_remote_code=True, streaming=True)
+        self.stream = iter(self.dataset)
         self.transform = transform
         
         # If we have a custom label mapping, use it
@@ -85,27 +86,37 @@ class LaionImageNetDataset(Dataset):
             # Create default mapping - this would map ImageNet synsets to our categories
             # For now, we'll just use the original ImageNet labels
             self.label_mapping = None
-        
+
+    def __iter__(self):
+        """Make the dataset iterable for streaming."""
+        for item in self.dataset:
+            # Convert image to RGB if needed
+            img = item['image'].convert('RGB')
+            
+            if self.transform:
+                img = self.transform(img)
+            
+            # Get label - handle both raw label and mapped label
+            label = item['label']
+            
+            # If we have a label mapping, apply it
+            if self.label_mapping:
+                # This assumes the mapping converts from ImageNet ID to our category ID
+                label = self.label_mapping.get(str(label), label)
+            
+            yield img, label
+
     def __len__(self):
-        return len(self.dataset)
+        # Streaming datasets don't support len() operation
+        # We can't determine the length without iterating through the whole dataset
+        # So we'll raise an error to indicate this limitation
+        raise NotImplementedError("Streaming datasets don't support __len__")
         
     def __getitem__(self, idx):
-        item = self.dataset[idx]
-        # Convert image to RGB if needed
-        img = item['image'].convert('RGB')
+        # Streaming datasets don't support random access
+        # This method is not compatible with streaming datasets
+        raise NotImplementedError("Streaming datasets don't support random indexing (__getitem__) with an index. Use iteration instead.")
         
-        if self.transform:
-            img = self.transform(img)
-        
-        # Get label - handle both raw label and mapped label
-        label = item['label']
-        
-        # If we have a label mapping, apply it
-        if self.label_mapping:
-            # This assumes the mapping converts from ImageNet ID to our category ID
-            label = self.label_mapping.get(str(label), label)
-        
-        return img, label
 
 
 def get_transforms():
@@ -127,25 +138,34 @@ class ImageNetDataset(Dataset):
             split: 'train', 'validation', or 'test'
             transform: torchvision transforms to apply to images
         """
-        # Load ImageNet-1K dataset from HuggingFace
-        self.dataset = load_dataset("ILSVRC/imagenet-1k", split=split, trust_remote_code=True)
+        # Load ImageNet-1K dataset from HuggingFace with streaming enabled
+        self.dataset = load_dataset("ILSVRC/imagenet-1k", split=split, trust_remote_code=True, streaming=True)
         self.transform = transform
-        
+
+    def __iter__(self):
+        """Make the dataset iterable for streaming."""
+        for item in self.dataset:
+            # Convert image to RGB if needed
+            img = item['image'].convert('RGB')
+            
+            if self.transform:
+                img = self.transform(img)
+            
+            # Label is already in numeric form in ImageNet
+            label = item['label']
+            
+            yield img, label
+
     def __len__(self):
-        return len(self.dataset)
+        # Streaming datasets don't support len() operation
+        # We can't determine the length without iterating through the whole dataset
+        # So we'll raise an error to indicate this limitation
+        raise NotImplementedError("Streaming datasets don't support __len__")
         
     def __getitem__(self, idx):
-        item = self.dataset[idx]
-        # Convert image to RGB if needed
-        img = item['image'].convert('RGB')
-        
-        if self.transform:
-            img = self.transform(img)
-        
-        # Label is already in numeric form in ImageNet
-        label = item['label']
-        
-        return img, label
+        # Streaming datasets don't support random access
+        # This method is not compatible with streaming datasets
+        raise NotImplementedError("Streaming datasets don't support random indexing (__getitem__) with an index. Use iteration instead.")
 
 
 class PdExtendedDataset(Dataset):
@@ -206,7 +226,7 @@ def get_imagenet_dataloader(split='train', batch_size=32, shuffle=True, transfor
     Args:
         split: 'train', 'validation', or 'test'
         batch_size: batch size for dataloader
-        shuffle: whether to shuffle the data
+        shuffle: whether to shuffle the data (Note: with streaming, this uses a buffer-based shuffle)
         transform: torchvision transforms to apply
         num_workers: number of worker processes for data loading
     """
@@ -226,7 +246,7 @@ def get_imagenet_dataloader(split='train', batch_size=32, shuffle=True, transfor
     dataloader = DataLoader(
         dataset,
         batch_size=batch_size,
-        shuffle=shuffle,
+        shuffle=False,  # For streaming datasets, we disable shuffle here
         num_workers=num_workers,
         pin_memory=True
     )
@@ -262,6 +282,7 @@ def get_dataset_by_format(dataset_format='imagenet', split='train', batch_size=3
                 ])
         
         dataset = ImageNetDataset(split=split, transform=transform, **kwargs)
+        shuffle = False  # Disable shuffling for streaming datasets
     elif dataset_format == 'laion' or dataset_format == 'json':
         # For JSON format, split parameter should be the path to the JSON file
         json_path = split
@@ -296,6 +317,7 @@ def get_dataset_by_format(dataset_format='imagenet', split='train', batch_size=3
                 ])
         
         dataset = LaionImageNetDataset(split=split, transform=transform, **kwargs)
+        shuffle = False  # Disable shuffling for streaming datasets
     elif dataset_format == 'pd_extended':
         # Using PD Extended format (streamed HuggingFace parquet with pre-classified labels)
         if transform is None:
